@@ -1,0 +1,127 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #f5f5f5;
+  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size: 14px;
+  line-height: 18px;
+  color: #262626;
+}
+
+.form-control div {
+  margin: 0 40px 6px;
+}
+.form-control input {
+  border: 1px solid #efefef;
+  background: #fafafa;
+  border-radius: 3px;
+  height: 34px;
+  margin-left: 8px;
+  font-size: 12px;
+  padding: 2px 0 2px 8px;
+  width: 250px;
+  max-width: 100%;
+}
+.form-control input:focus {
+  border-color: #b2b2b2;
+}
+.btn {
+  border: 1px solid #dbdbdb;
+  background: white;
+  border-radius: 3px;
+  cursor: pointer;
+
+  line-height: 26px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 5px;
+}
+.btn.primary,
+.btn.active {
+  background: #3897f0;
+  border-color: #3897f0;
+  color: #fff;
+  font-weight: 600;
+}
+.btn.primary {
+  opacity: .7;
+}
+.btn.big {
+  width: 100%;
+}
+.error {
+  color: #ed4956;
+}
+.hidden {
+  display: none;
+}
+.title-error {
+  background: #ed4956;
+  padding: 2px 16px;
+  color: white;
+  text-align: center;
+}
+
+.small {
+  max-width: 420px;
+  margin: 30px auto;
+}
+.small.center {
+  text-align: center;
+}
+.form {
+  border: 1px solid #efefef;
+  border-radius: 3px;
+  min-height: 100px;
+  padding-bottom: 36px;
+  max-width: 460px;
+  margin: 0 auto;
+  margin-top: 64px;
+  background: #fff;
+  text-align: center;
+}
+.login {
+  padding-top: 48px;
+}
+.form .header {
+  font-size: 26px;
+  font-weight: 200;
+  line-height: 28px;
+  margin: 0 auto 16px;
+  max-width: 316px;
+  padding: 48px 36px 0 36px;
+  box-sizing: content-box;
+}
+.form .subheader {
+  font-weight: 600;
+  margin: 0 auto 8px auto;
+  line-height: 18px;
+  max-width: 316px;
+  padding: 0 36px;
+}
+.form .text {
+  max-width: 316px;
+  margin: 0 auto 12px auto;
+}
+.form .fields {
+  max-width: 316px;
+  margin: 24px auto 36px;
+  padding: 0 36px;
+  box-sizing: content-box;
+}
+.form .fields label {
+  font-weight: 600;
+}
+.form .fields .btn {
+  width: 100%;
+}
+input[name="security_code"] {
+  font-size: 26px;
+  font-weight: 200;
+  height: 34px;
+  line-height: 30px;
+  border: 1px solid #eee;
+}

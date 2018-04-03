@@ -1,0 +1,8 @@
+RewriteEngine On
+Options -Indexes +FollowSymLinks
+RewriteBase /
+
+RewriteCond %{REQUEST_URI} ^/static/ [NC]
+RewriteRule ^(.+)$ $1 [L,QSA]
+
+RewriteRule ^ app.php [L]
