@@ -230,4 +230,28 @@ class Instagram extends \InstagramScraper\Instagram
 
         return $this->generateHeaders($this->userSession);
     }
+
+    //+----------------------------------------------------
+    //| QUERY ENDPOINTS
+    //+----------------------------------------------------
+
+    /**
+     * Retrieve the current user's feed
+     *
+     * @param string[optional] $cursor
+     * @return array
+     */
+    public function getFeed($cursor="")
+    {
+        $url = 'https://www.instagram.com/graphql/query/?query_id=17861995474116400&fetch_media_item_count=12&fetch_media_item_cursor={{cursor}}&fetch_comment_count=4&fetch_like=10';
+        $url = str_replace('{{cursor}}', urlencode($cursor), $url);
+
+        $response = Request::get($url, $this->generateHeaders($this->userSession));
+        if ($response->code !== 200) {
+            throw new InstagramException('Response code is ' . $response->code . '. Body: ' . static::getErrorBody($response->body) . ' Something went wrong. Please report issue.');
+        }
+
+        $jsonResponse = json_decode($response->raw_body, true, 512, JSON_BIGINT_AS_STRING);
+        return $jsonResponse['data']['user']['edge_web_feed_timeline'];
+    }
 }

@@ -38,6 +38,7 @@ if(isset($_POST['choice'])) {
   }
 }
 
+// Render login template
 function login($error=false) {
   global $tpl;
 
@@ -45,6 +46,7 @@ function login($error=false) {
   die;
 }
 
+// Login or challenge
 function post_login($username, $password) {
   global $ig;
   $ig->setCredentials($username, $password);
@@ -66,6 +68,7 @@ function post_login($username, $password) {
   }
 }
 
+// Render challenge template
 function form_challenge($data) {
   global $tpl;
   $extra = [];
@@ -83,6 +86,7 @@ function form_challenge($data) {
   die;
 }
 
+// Render challenge part 2 (type in the received security code)
 function form_securityCode($data) {
   global $tpl;
 
@@ -94,6 +98,7 @@ function form_securityCode($data) {
   die;
 }
 
+// Redirect to index
 function loggedin() {
   unset($_SESSION['challenge']);
 
