@@ -57,20 +57,20 @@ class Instagram extends \InstagramAPI\Instagram
    * @param string $securityCode
    */
   function postSecurityCode($username, $url, $headers, $securityCode) {
-      $response = Request::post($url, $headers, ['security_code' => $securityCode]);
+    $response = Request::post($url, $headers, ['security_code' => $securityCode]);
 
-      if ($response->code !== 200) {
-          throw new InstagramChallengeException();
-      }
-      $html = $response->raw_body;
+    if ($response->code !== 200) {
+        throw new InstagramChallengeException();
+    }
+    $html = $response->raw_body;
 
-      // We got back the security code form
-      if (preg_match('/name="security_code"/', $html, $matches)) {
-        return self::html_sharedData($response->raw_body);
-      }
+    // We got back the security code form
+    if (preg_match('/name="security_code"/', $html, $matches)) {
+      return self::html_sharedData($response->raw_body);
+    }
 
-      // Save cookies jar
-      $this->saveCookies($username, $response->headers['Set-Cookie']);
+    // Save cookies jar
+    $this->saveCookies($username, $response->headers['Set-Cookie']);
   }
 
   /**
@@ -174,8 +174,6 @@ class Instagram extends \InstagramAPI\Instagram
 
     $this->settings->set('account_id', $account_id);
     $this->settings->set('last_login', time());
-
-    $this->_sendLoginFlow(true);
   }
 
   /**
