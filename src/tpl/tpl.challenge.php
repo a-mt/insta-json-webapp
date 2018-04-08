@@ -57,6 +57,14 @@
       <?php }
       break;
 
+    case "security_code":
+      $_field = $_fields['value'];
+
+      echo '<input type="number"
+                   name="' . $_fields['input_name'] . '"
+                   placeholder="' . (!empty($_field['placeholder']) ? $_field['placeholder'] : $_field['label']) . '">';
+      break;
+
     case "text":
     case "number": ?>
 

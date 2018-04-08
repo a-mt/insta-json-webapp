@@ -1,257 +1,199 @@
 <?php
-use InstagramScraper\Exception\InstagramAuthException;
-use InstagramScraper\Exception\InstagramException;
-use InstagramScraper\Exception\InstagramNotFoundException;
-use InstagramScraper\Model\Account;
-use InstagramScraper\Model\Comment;
-use InstagramScraper\Model\Like;
-use InstagramScraper\Model\Location;
-use InstagramScraper\Model\Media;
-use InstagramScraper\Model\Story;
-use InstagramScraper\Model\Tag;
-use InstagramScraper\Model\UserStories;
-use InstagramScraper\Endpoints;
-use phpFastCache\CacheManager;
 use Unirest\Request;
+\InstagramAPI\Instagram::$allowDangerousWebUsageAtMyOwnRisk = true;
 
-class InstagramChallenge extends Exception {
-    protected $_extra;
-
-    public function __construct($message="", $code=0, Exception $previous=NULL, $extra = []) {
-        $this->_extra = $extra;
-        parent::__construct($message, $code, $previous);
-    }
-    public function get($field) {
-        return isset($this->_extra[$field]) ? $this->_extra[$field] : null;
-    }
-}
-class InstagramSecurityCode extends InstagramChallenge {}
+class InstagramChallengeException extends \InstagramAPI\Exception\InternalException {}
 
 class HTMLParser extends DOMDocument {
 
-    public function loadHTML($html, $options = NULL) {
-        libxml_use_internal_errors(true);
-        parent::loadHTML($html, $options);
-        libxml_clear_errors();
-    }
-    
-    public function getElementsByClassName($classname, $parentNode = null) {
-        $xpath = new DomXPath($this);
-        return $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' $classname ')]", $parentNode);
-    }
+  public function loadHTML($html, $options = NULL) {
+    libxml_use_internal_errors(true);
+    parent::loadHTML($html, $options);
+    libxml_clear_errors();
+  }
+  public function getElementsByClassName($classname, $parentNode = null) {
+    $xpath = new DomXPath($this);
+    return $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' $classname ')]", $parentNode);
+  }
 }
 
-class Instagram extends \InstagramScraper\Instagram
+class Instagram extends \InstagramAPI\Instagram
 {
-    /**
-     * Sets the username and password
-     * 
-     * @param string $username
-     * @param string $password
-     */
-    public function setCredentials($username, $password) {
-        $this->sessionUsername = $username;
-        $this->sessionPassword = $password;
+  /**
+   * Request Instagram to get Challenge
+   * @param string $url
+   * @return array
+   */
+  function getChallenge($url, $headers) {
+    $response = Request::get($url, $headers);
+    $html     = $response->raw_body;
+
+    // Retrieve value of _sharedData
+    if (!preg_match('/window._sharedData\s\=\s(.*?)\;<\/script>/', $html, $matches)) {
+        throw new InstagramChallengeException();
+    }
+    return json_decode($matches[1], true, 512, JSON_BIGINT_AS_STRING);
+  }
+
+  /**
+   * Submit Challenge to Instagram and receive Security Code Form
+   * @param string $choice
+   */
+  function postChallenge($url, $headers, $choice) {
+    $response = Request::post($url, $headers, ['choice' => $choice]);
+    $html     = $response->raw_body;
+
+    if ($response->code !== 200) {
+        throw new InstagramChallengeException();
+    }
+    if (!preg_match('/name="security_code"/', $html, $matches)) {
+      throw new InstagramChallengeException();
+    }
+    return self::html_sharedData($html);
+  }
+
+  /**
+   * Submit Security Code to Instagram and receive either confirmation or Security Code Form
+   * @param string $securityCode
+   */
+  function postSecurityCode($username, $url, $headers, $securityCode) {
+      $response = Request::post($url, $headers, ['security_code' => $securityCode]);
+
+      if ($response->code !== 200) {
+          throw new InstagramChallengeException();
+      }
+      $html = $response->raw_body;
+
+      // We got back the security code form
+      if (preg_match('/name="security_code"/', $html, $matches)) {
+        return self::html_sharedData($response->raw_body);
+      }
+
+      // Save cookies jar
+      $this->saveCookies($username, $response->headers['Set-Cookie']);
+  }
+
+  /**
+   * Turns the HTML response into a list of fields to display
+   * @param string $html
+   * @return array
+   */
+  public static function html_sharedData($html) {
+
+    // Return confirm form
+    $data = [];
+    $dom  = new HTMLParser;
+    $dom->loadHTML($html);
+
+    if(!$section = $dom->getElementsByTagName('section')) {
+      throw new InstagramChallengeException();
     }
 
-    /**
-     * Try to login with the credentials we got
-     * @throws InstagramAuthException | InstagramChallenge
-     * @param bool[optional] $force - [false]
-     */
-    public function login($force = false, $support_two_step_verification = false) {
-        return parent::login($force, true);
+    // Get header, text
+    $section = $section[0];
+    if($item = $dom->getElementsByClassName("header", $section)) {
+      $data['GraphChallengePageHeader'] = ['title' => $item[0]->nodeValue];
+    }
+    if($item = $dom->getElementsByClassName("gray-description-text", $section)) {
+      $data['GraphChallengePageText'] = ['text' => $item[0]->nodeValue];
     }
 
-    /**
-     * Login: Instagram responds a challenge (mail, phone, simple click...)
-     * @param \Unirest\Response $response
-     * @param array $cookies
-     * @throws InstagramChallenge
-     */
-    protected function verifyTwoStep($response, $cookies) {
-        throw new InstagramChallenge($response->body->message, 0, null, [
-          "response" => $response,
-          "cookies"  => $cookies
-        ]);
+    // Get fields
+    $form = ['fields' => []];
+
+    foreach($section->getElementsByTagName('form') as $_form) {
+      if($_form->hasAttribute('id') && $_form->getAttribute('id') == "reset_progress_form") {
+        continue;
+      }
+      foreach($_form->getElementsByTagName('input') as $_field) {
+        $type = $_field->hasAttribute('type') ? $_field->getAttribute('type') : 'text';
+
+        if($type == "submit") {
+          $form['call_to_action'] = $_field->hasAttribute('value') ? $_field->getAttribute('value') : 'Submit';
+        } else {
+          $attrs = [];
+
+          foreach ($_field->attributes as $attr) {
+            $attrs[$attr->nodeName] = $attr->nodeValue;
+          }
+          $form['fields'][] = [
+            'input_type' => $type,
+            'values'     => [$attrs]
+          ];
+        }
+      }
+    }
+    $data['GraphChallengePageForm'] = $form;
+    $challenge = [
+      'challengeType' => 'EnterSecurityCode',
+      'fields'        => false,
+      'extraData'     => $data
+    ];
+
+    return ['entry_data' => [
+      'Challenge' => [$challenge]
+    ]];
+  }
+
+  /**
+   * @param string $username
+   * @param array $cookieHeader
+   */
+  protected function saveCookies($username, $cookieHeader) {
+    $account_id = "";
+
+    // Create cookie jar
+    $cookieJar = $this->getCookieJar($username);
+
+    foreach($cookieHeader as $cookie) {
+      $sc = \GuzzleHttp\Cookie\SetCookie::fromString($cookie);
+
+      if(!$sc->getExpires()) {
+        continue;
+      }
+
+      if($sc->getName() == "sessionid") {
+        $sessionid  = urldecode($sc->getValue());
+        $data       = json_decode('{' . explode('{', urldecode($sessionid), 2)[1], true);
+        $account_id = $data['_auth_user_id'];
+      }
+      if(!$sc->getDomain()) {
+        $sc->setDomain("i.instagram.com");
+      }
+      $cookieJar->setCookie($sc);
     }
 
-    /**
-     * Get the challenge form
-     * 
-     * @param \Unirest\Response $response
-     * @param array $cookies
-     * @return array
-     */
-    public function get_challengeForm($response, $cookies) {
+    // Update client's cookieJar
+    $prop = (new ReflectionObject($this->client))->getProperty('_cookieJar');
+    $prop->setAccessible(true);
+    $prop->setValue($this->client, $cookieJar);
 
-        // Retrieve challenge
-        $new_cookies   = static::parseCookies($response->headers['Set-Cookie']);
-        $cookies       = array_merge($cookies, $new_cookies);
-        $cookie_string = '';
+    // Update loginState
+    $this->isMaybeLoggedIn = true;
+    $this->account_id = $account_id;
 
-        foreach ($cookies as $name => $value) {
-            $cookie_string .= $name . "=" . $value . "; ";
-        }
-        $headers = [
-          'cookie'      => $cookie_string,
-          'referer'     => Endpoints::LOGIN_URL,
-          'x-csrftoken' => $cookies['csrftoken']
-        ];
+    $this->settings->set('account_id', $account_id);
+    $this->settings->set('last_login', time());
 
-        $url      = Endpoints::BASE_URL . $response->body->checkpoint_url;
-        $response = Request::get($url, $headers);
+    $this->_sendLoginFlow(true);
+  }
 
-        // Retrieve value of _sharedData
-        if (!preg_match('/window._sharedData\s\=\s(.*?)\;<\/script>/', $response->raw_body, $matches)) {
-            throw new InstagramAuthException('Something went wrong when try challenge. Please report issue.');
-        }
-        $data = json_decode($matches[1], true, 512, JSON_BIGINT_AS_STRING);
+  /**
+   * @param string $username
+   * @return \GuzzleHttp\Cookie\CookieJar
+   */
+  protected function getCookieJar($username) {
+    $this->settings->setActiveUser($_SESSION['username']);
 
-        $_SESSION['challenge'] = [
-            'url'     => $url,
-            'headers' => $headers
-        ];
-        return $data;
+    // Attempt to restore the cookies, otherwise create a new, empty jar.
+    $cookieData      = $this->settings->getCookies();
+    $restoredCookies = is_string($cookieData) ? @json_decode($cookieData, true) : [];
+
+    if (!is_array($restoredCookies)) {
+        $restoredCookies = [];
     }
 
-    /**
-     * Submit the challenge (send mail)
-     * 
-     * @throws InstagramAuthException | InstagramSecurityCode
-     * @param string $choice
-     */
-    public function post_challenge($choice) {
-        if(!$_SESSION['challenge']) {
-            return;
-        }
-
-        $url      = $_SESSION['challenge']['url'];
-        $headers  = $_SESSION['challenge']['headers'];
-        $response = Request::post($url, $headers, ['choice' => $choice]);
-
-        if (!preg_match('/name="security_code"/', $response->raw_body, $matches)) {
-            throw new InstagramAuthException('Something went wrong when try challenge. Please report issue.');
-        }
-        return self::get_securityCodeForm($response);
-    }
-
-    /**
-     * Turns the HTML response into a list of fields to display
-     * @param \Unirest\Response $response
-     * @return array
-     */
-    public static function get_securityCodeForm($response) {
-
-        // Return confirm form
-        $data = [];
-        $dom  = new HTMLParser;
-        $dom->loadHTML($response->raw_body);
-
-        if(!$section = $dom->getElementsByTagName('section')) {
-            throw new InstagramAuthException('Something went wrong when try challenge. Please report issue.');
-        }
-
-        // Get header, text
-        $section = $section[0];
-        if($item = $dom->getElementsByClassName("header", $section)) {
-            $data['GraphChallengePageHeader'] = ['title' => $item[0]->nodeValue];
-        }
-        if($item = $dom->getElementsByClassName("gray-description-text", $section)) {
-            $data['GraphChallengePageText'] = ['text' => $item[0]->nodeValue];
-        }
-
-        // Get fields
-        $form = ['fields' => []];
-
-        foreach($section->getElementsByTagName('form') as $_form) {
-            if($_form->hasAttribute('id') && $_form->getAttribute('id') == "reset_progress_form") {
-                continue;
-            }
-            foreach($_form->getElementsByTagName('input') as $_field) {
-                $type = $_field->hasAttribute('type') ? $_field->getAttribute('type') : 'text';
-
-                if($type == "submit") {
-                    $form['call_to_action'] = $_field->hasAttribute('value') ? $_field->getAttribute('value') : 'Submit';
-                } else {
-                    $attrs = [];
-
-                    foreach ($_field->attributes as $attr) {
-                        $attrs[$attr->nodeName] = $attr->nodeValue;
-                    }
-                    $form['fields'][] = [
-                        'input_type' => $type,
-                        'values'     => [$attrs]
-                    ];
-                }
-            }
-        }
-        $data['GraphChallengePageForm'] = $form;
-        return $data;
-    }
-
-    /**
-     * Submit the security code
-     * 
-     * @throws InstagramAuthException | InstagramSecurityCode
-     * @param string $security_code
-     * @param string $csrftoken
-     * @return array
-     */
-    public function post_securityCode($security_code, $csrftoken) {
-        $url      = $_SESSION['challenge']['url'];
-        $headers  = $_SESSION['challenge']['headers'];
-
-        $post_data = [
-            'csrfmiddlewaretoken' => $csrftoken,
-            'verify'              => 'Verify Account',
-            'security_code'       => $security_code,
-        ];
-        $response = Request::post($url, $headers, $post_data);
-        if ($response->code !== 200) {
-            throw new InstagramAuthException('Something went wrong when try enter security code. Please report issue.');
-        }
-
-        // We got back the security code form
-        if (preg_match('/name="security_code"/', $response->raw_body, $matches)) {
-            throw new InstagramSecurityCode('securitycode_required', 0, null, [
-                'response' => $response
-            ]);
-        }
-
-        // Looks like we've logged in: retrieve cookies
-        $cookies = static::parseCookies($response->headers['Set-Cookie']);
-        $this->userSession = $cookies;
-
-        // Cache them
-        $cachedString = static::$instanceCache->getItem($this->sessionUsername);
-        $cachedString->set($cookies);
-        static::$instanceCache->save($cachedString);
-
-        return $this->generateHeaders($this->userSession);
-    }
-
-    //+----------------------------------------------------
-    //| QUERY ENDPOINTS
-    //+----------------------------------------------------
-
-    /**
-     * Retrieve the current user's feed
-     *
-     * @param string[optional] $cursor
-     * @return array
-     */
-    public function getFeed($cursor="")
-    {
-        $url = 'https://www.instagram.com/graphql/query/?query_id=17861995474116400&fetch_media_item_count=12&fetch_media_item_cursor={{cursor}}&fetch_comment_count=4&fetch_like=10';
-        $url = str_replace('{{cursor}}', urlencode($cursor), $url);
-
-        $response = Request::get($url, $this->generateHeaders($this->userSession));
-        if ($response->code !== 200) {
-            throw new InstagramException('Response code is ' . $response->code . '. Body: ' . static::getErrorBody($response->body) . ' Something went wrong. Please report issue.');
-        }
-
-        $jsonResponse = json_decode($response->raw_body, true, 512, JSON_BIGINT_AS_STRING);
-        return $jsonResponse['data']['user']['edge_web_feed_timeline'];
-    }
+    // Memory-based cookie jar which must be manually saved later.
+    return new \GuzzleHttp\Cookie\CookieJar(false, $restoredCookies);
+  }
 }

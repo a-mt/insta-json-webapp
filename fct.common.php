@@ -1,19 +1,11 @@
 <?php
+$ig = new Instagram();
+
 function isLoggedin() {
     if(!isset($_SESSION['user'])) {
       return false;
     }
     global $ig;
-
-    // Get session from cache
-    try {
-      $ig = Instagram::withCredentials($_SESSION['user']['username'], "-");
-      $ig->login();
-    
-    } catch(\InstagramScraper\Exception\InstagramAuthException $e) {
-      return false;
-    }
-
     return true;
 }
 

@@ -4,38 +4,35 @@ if(isset($_SESSION['user'])) {
   exit;
 }
 
-$ig = Instagram::withCredentials(@$_SESSION['username'], @$_SESSION['password']);
-
-// POST username + password
+// POST Step 1: username + password
 if(isset($_POST['username'])) {
-
-  try {
-    post_login($_POST['username'], $_POST['password']);
-  } catch(\InstagramScraper\Exception\InstagramAuthException $e) {
-    login($e->getMessage());
-  }
+  postLogin($_POST['username'], $_POST['password']);
   loggedin();
 }
 
-// POST security code > login ?
-if(isset($_POST['security_code'])) {
-  try {
-    $ig->post_securityCode($_POST['security_code'], $_POST['csrfmiddlewaretoken']);
-  } catch(InstagramSecurityCode $e) {
-
-    $response  = $e->get('response');
-    $challenge = $ig->get_securityCodeForm($response);
-
-    form_securityCode($challenge);
+// POST Step 2: Choose challenge (send mail/sms)
+if(isset($_POST['choice']) && isset($_SESSION['challenge'])) {
+  if($challenge = $ig->postChallenge(
+    $_SESSION['challenge']['url'],
+    $_SESSION['challenge']['headers'],
+    $_POST['choice'])
+  ) {
+    formChallenge($challenge['entry_data']['Challenge'][0]);
   }
-  loggedin();
 }
 
-// POST challenge choice > enter security code
-if(isset($_POST['choice'])) {
-  if($challenge = $ig->post_challenge($_POST['choice'])) {
-    form_securityCode($challenge);
+// POST Step 3 : Enter security code
+if(isset($_POST['security_code']) && isset($_SESSION['challenge'])) {
+  if($challenge = $ig->postSecurityCode(
+      $_SESSION['username'],
+      $_SESSION['challenge']['url'],
+      $_SESSION['challenge']['headers'],
+      $_POST['security_code'])
+  ) {
+    // Code expired / wrong security code
+    formChallenge($challenge['entry_data']['Challenge'][0]);
   }
+  loggedin();
 }
 
 // Render login template
@@ -47,52 +44,68 @@ function login($error=false) {
 }
 
 // Login or challenge
-function post_login($username, $password) {
+function postLogin($username, $password) {
   global $ig;
-  $ig->setCredentials($username, $password);
 
   $_SESSION['username'] = $username;
   $_SESSION['password'] = $password;
 
   try {
-    $ig->login(true);
+    $ig->login($username, $password);
     unset($_SESSION['challenge']);
 
-  } catch(InstagramChallenge $e) {
-    $response  = $e->get('response');
-    $cookies   = $e->get('cookies');
-    $challenge = $ig->get_challengeForm($response, $cookies);
+  // Wrong credentials
+  } catch(\InstagramAPI\Exception\IncorrectPasswordException $e) {
+    login(preg_replace('/^[^:]+: /', '', $e->getMessage()));
 
-    form_challenge($challenge['entry_data']['Challenge'][0]);
-    die;
+  // Requires challenge
+  } catch(\InstagramAPI\Exception\ChallengeRequiredException $e) {
+    $setCookies = json_decode($ig->client->getCookieJarAsJSON());
+    $csrfToken  = "";
+    $mid        = "";
+
+    foreach($setCookies as $setCookie) {
+      if($setCookie->Name == "csrftoken") {
+        $csrfToken = $setCookie->Value;
+
+      } else if($setCookie->Name == "mid") {
+        $mid = $setCookie->Value;
+      }
+    }
+
+    $headers = [
+      'x-csrftoken' => $ig->client->getToken(),
+      'cookie'      => "csrftoken=$csrfToken; mid=$mid;",
+      'referer'     => 'https://www.instagram.com/accounts/login/ajax/'
+    ];
+    $url       = $e->getResponse()->getChallenge()->getUrl();
+    $challenge = $ig->getChallenge($url, $headers);
+
+    $_SESSION['challenge'] = [
+      'url'     => $url,
+      'headers' => $headers
+    ];
+    formChallenge($challenge['entry_data']['Challenge'][0]);
   }
 }
 
 // Render challenge template
-function form_challenge($data) {
+function formChallenge($data) {
   global $tpl;
   $extra = [];
 
-  foreach($data['extraData']['content'] as $extraData) {
-    $name = $extraData['__typename'];
-    unset($extraData['__typename']);
-    $extra[$name] = $extraData;
+  if(isset($data['extraData']['content'])) {
+    foreach($data['extraData']['content'] as $extraData) {
+      $name = $extraData['__typename'];
+      unset($extraData['__typename']);
+      $extra[$name] = $extraData;
+    }
+  } else {
+    $extra = $data['extraData'];
   }
   $tpl->assign('challengeType', $data['challengeType']);
   $tpl->assign('extraData', $extra);
   $tpl->assign('fields', $data['fields']);
-
-  print $tpl->challenge();
-  die;
-}
-
-// Render challenge part 2 (type in the received security code)
-function form_securityCode($data) {
-  global $tpl;
-
-  $tpl->assign('challengeType', 'Confirm');
-  $tpl->assign('extraData', $data);
-  $tpl->assign('fields', false);
 
   print $tpl->challenge();
   die;
@@ -103,7 +116,8 @@ function loggedin() {
   unset($_SESSION['challenge']);
 
   $_SESSION = ['user' => [
-    'username' => $_SESSION['username']
+    'username' => $_SESSION['username'],
+    "password" => $_SESSION['password']
   ]];
   header('Location: /');
   exit;
