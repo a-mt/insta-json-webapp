@@ -1,0 +1,6 @@
+{
+  "require": {
+    "php": "~7.2",
+    "mgp25/instagram-php": "^4.0"
+  }
+}

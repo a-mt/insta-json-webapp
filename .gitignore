@@ -1,4 +1,3 @@
 .env
-composer*
 *.bak
 vendor
