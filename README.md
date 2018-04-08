@@ -1,4 +1,14 @@
 
+# Exemples
+
+To display the result of a given method (JSON):
+
+    ?=account_getCurrentUser
+
+To display the list of medias:
+
+    ?_=collection_getFeed&collectionId=COLLECTION_ID&_gallery
+
 # Install
 
 ## Install php-curl

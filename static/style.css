@@ -125,3 +125,33 @@ input[name="security_code"] {
   line-height: 30px;
   border: 1px solid #eee;
 }
+.items {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  justify-content: flex-start;
+  align-items: flex-start;
+  align-content: flex-start;
+}
+.items .item {
+  width: 250px;
+  max-height: 305px;
+}
+.item {
+  background-color: #fff;
+  padding: 10px;
+  overflow: auto;
+  border: 1px solid #e4e4e4;
+  border-radius: 6.2px;
+  position: relative;
+  margin: auto auto 20px;
+}
+.item.alone {
+  margin: 10px;
+}
+.item a {
+  display: block;
+}
+.item img {
+  width: 100%;
+}

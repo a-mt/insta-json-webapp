@@ -28,15 +28,19 @@ if(!empty($action = @$_GET['_']) && strpos($action, '_')) {
         if(!$parameter->isOptional()) {
           throw new Exception("Parameter $name wasn't provided");
         }
-        $args[] = "";
+        $args[] = $parameter->getDefaultValue();
       }
     }
 
     // Call method
     $response = call_user_func_array(array($ig->$path, $method), $args);
+    if(isset($_GET['_gallery'])) {
+      print $tpl->gallery(['data' => $response->asArray()]);
 
-    header('Content-Type: application/json');
-    echo (string) $response->getHttpResponse()->getBody();
+    } else {
+      header('Content-Type: application/json');
+      echo (string) $response->getHttpResponse()->getBody();
+    }
     die;
   }
 }
