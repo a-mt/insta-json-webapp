@@ -19,6 +19,32 @@ class HTMLParser extends DOMDocument {
 
 class Instagram extends \InstagramAPI\Instagram
 {
+  function getChallengeData($e) {
+    $setCookies = json_decode($this->client->getCookieJarAsJSON());
+    $csrfToken  = "";
+    $mid        = "";
+
+    foreach($setCookies as $setCookie) {
+      if($setCookie->Name == "csrftoken") {
+        $csrfToken = $setCookie->Value;
+
+      } else if($setCookie->Name == "mid") {
+        $mid = $setCookie->Value;
+      }
+    }
+
+    $headers = [
+      'x-csrftoken' => $this->client->getToken(),
+      'cookie'      => "csrftoken=$csrfToken; mid=$mid;",
+      'referer'     => 'https://www.instagram.com/accounts/login/ajax/'
+    ];
+
+    $challenge = $e->getResponse()->getChallenge();
+    return [
+      'url'     => is_array($challenge) ? $challenge['url'] : $challenge->getUrl(),
+      'headers' => $headers
+    ];
+  }
   /**
    * Request Instagram to get Challenge
    * @param string $url

@@ -5,7 +5,16 @@ if(!isLoggedin()) {
   header('Location: /login');
   exit;
 }
-$ig->login($_SESSION['user']['username'], $_SESSION['user']['password']);
+try {
+  $ig->login($_SESSION['user']['username'], $_SESSION['user']['password']);
+
+} catch(\InstagramAPI\Exception\ChallengeRequiredException $e) {
+  $challengeData = $ig->getChallengeData($e);
+  $challenge     = $ig->getChallenge($challengeData['url'], $challengeData['headers']);
+
+  $_SESSION['challenge'] = $challengeData;
+  formChallenge($challenge['entry_data']['Challenge'][0]);
+}
 
 // Query
 if(!empty($action = @$_GET['_']) && strpos($action, '_')) {

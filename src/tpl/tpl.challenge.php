@@ -16,7 +16,7 @@
   <?php } ?>
 
   <!-- Choice -->
-  <form method="POST">
+  <form method="POST" action="/login">
     <input type="hidden" name="challenge" value="<?= $challengeType ?>">
 
   <?php foreach($extraData['GraphChallengePageForm']['fields'] as $_fields) {

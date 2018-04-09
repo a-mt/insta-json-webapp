@@ -60,55 +60,12 @@ function postLogin($username, $password) {
 
   // Requires challenge
   } catch(\InstagramAPI\Exception\ChallengeRequiredException $e) {
-    $setCookies = json_decode($ig->client->getCookieJarAsJSON());
-    $csrfToken  = "";
-    $mid        = "";
+    $challengeData = $ig->getChallengeData($e);
+    $challenge     = $ig->getChallenge($challengeData['url'], $challengeData['headers']);
 
-    foreach($setCookies as $setCookie) {
-      if($setCookie->Name == "csrftoken") {
-        $csrfToken = $setCookie->Value;
-
-      } else if($setCookie->Name == "mid") {
-        $mid = $setCookie->Value;
-      }
-    }
-
-    $headers = [
-      'x-csrftoken' => $ig->client->getToken(),
-      'cookie'      => "csrftoken=$csrfToken; mid=$mid;",
-      'referer'     => 'https://www.instagram.com/accounts/login/ajax/'
-    ];
-    $url       = $e->getResponse()->getChallenge()->getUrl();
-    $challenge = $ig->getChallenge($url, $headers);
-
-    $_SESSION['challenge'] = [
-      'url'     => $url,
-      'headers' => $headers
-    ];
+    $_SESSION['challenge'] = $challengeData;
     formChallenge($challenge['entry_data']['Challenge'][0]);
   }
-}
-
-// Render challenge template
-function formChallenge($data) {
-  global $tpl;
-  $extra = [];
-
-  if(isset($data['extraData']['content'])) {
-    foreach($data['extraData']['content'] as $extraData) {
-      $name = $extraData['__typename'];
-      unset($extraData['__typename']);
-      $extra[$name] = $extraData;
-    }
-  } else {
-    $extra = $data['extraData'];
-  }
-  $tpl->assign('challengeType', $data['challengeType']);
-  $tpl->assign('extraData', $extra);
-  $tpl->assign('fields', $data['fields']);
-
-  print $tpl->challenge();
-  die;
 }
 
 // Redirect to index
