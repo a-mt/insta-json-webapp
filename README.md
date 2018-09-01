@@ -3,7 +3,7 @@
 
 To display the result of a given method (JSON):
 
-    ?=account_getCurrentUser
+    ?_=account_getCurrentUser
 
 To display the list of medias:
 
