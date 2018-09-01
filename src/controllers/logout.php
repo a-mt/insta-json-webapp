@@ -7,5 +7,5 @@ if(isset($_SESSION['user'])) {
 }
 
 session_destroy();
-header('Location: /');
+header('Location: ' . REWRITE_BASE);
 exit;

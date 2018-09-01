@@ -1,6 +1,6 @@
 <?php
 if(isset($_SESSION['user'])) {
-  header('Location: /');
+  header('Location: ' . REWRITE_BASE);
   exit;
 }
 
@@ -76,7 +76,7 @@ function loggedin() {
     'username' => $_SESSION['username'],
     "password" => $_SESSION['password']
   ]];
-  header('Location: /');
+  header('Location: ' . REWRITE_BASE);
   exit;
 }
 

@@ -2,7 +2,7 @@
 if(!isLoggedin()) {
   unset($_SESSION['user']);
 
-  header('Location: /login');
+  header('Location: ' . REWRITE_BASE . 'login');
   exit;
 }
 try {

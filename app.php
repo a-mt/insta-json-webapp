@@ -1,4 +1,6 @@
 <?php
+define("REWRITE_BASE", "/");
+
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -13,7 +15,9 @@ session_set_cookie_params(3600); // each client should remember their session id
 session_start();
 
 // Get controller
-$path = trim($_SERVER['REDIRECT_URL'], '/');
+$path = $_SERVER['REDIRECT_URL'];
+$path = preg_replace('#^' . REWRITE_BASE . '#', '', $path);
+$path = trim($path, "/");
 
 if(!$path) {
   $controller = 'index.php';
