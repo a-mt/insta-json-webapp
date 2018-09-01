@@ -36,7 +36,17 @@ if($items !== false) {
      }
      echo '</div>';
   }
-  echo '<div>';
+  
+  if($data['more_available']) {
+    $url = '?';
+    $_GET['maxId'] = $data['next_max_id'];
+
+    foreach($_GET as $param => $value) {
+        $url .= $param . '=' . $value . '&';
+    }
+    echo '<div class="item"><a href="' . $url . '">Next</a></div>';
+  }
+  echo '</div>';
 
 } else {
   echo '<div class="item alone">';

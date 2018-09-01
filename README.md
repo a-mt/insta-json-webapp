@@ -1,4 +1,6 @@
 
+Uses the library [mgp25/instagram-php](https://github.com/mgp25/Instagram-API)
+
 # Exemples
 
 To display the result of a given method (JSON):
@@ -41,8 +43,6 @@ If not, install it
     curl -sS https://getcomposer.org/installer | php
     sudo mv composer.phar composer
 
-## Require mgp25/instagram-php
+## Install dependencies
 
-https://github.com/mgp25/Instagram-API
-
-    composer require mgp25/instagram-php
+    composer install

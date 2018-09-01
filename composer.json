@@ -1,6 +1,10 @@
 {
   "require": {
     "php": "~7.2",
-    "mgp25/instagram-php": "^4.0"
+    "mgp25/instagram-php": "^4.1",
+    "mashape/unirest-php": "^3.0"
+  },
+  "autoload": {
+    "psr-0": {"Unirest": "lib/"}
   }
 }
